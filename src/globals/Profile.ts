@@ -12,15 +12,6 @@ export const Profile: GlobalConfig = {
       required: true,
     },
     {
-      name: 'heroHeadline',
-      type: 'text',
-      required: true,
-    },
-    {
-      name: 'bio',
-      type: 'textarea',
-    },
-    {
       name: 'githubLink',
       type: 'text',
     },

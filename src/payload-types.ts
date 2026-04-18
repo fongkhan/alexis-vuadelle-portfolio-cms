@@ -91,9 +91,15 @@ export interface Config {
   fallbackLocale: null;
   globals: {
     profile: Profile;
+    'home-page': HomePage;
+    'about-page': AboutPage;
+    'projects-page': ProjectsPage;
   };
   globalsSelect: {
     profile: ProfileSelect<false> | ProfileSelect<true>;
+    'home-page': HomePageSelect<false> | HomePageSelect<true>;
+    'about-page': AboutPageSelect<false> | AboutPageSelect<true>;
+    'projects-page': ProjectsPageSelect<false> | ProjectsPageSelect<true>;
   };
   locale: null;
   widgets: {
@@ -387,11 +393,60 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
 export interface Profile {
   id: number;
   name: string;
-  heroHeadline: string;
-  bio?: string | null;
   githubLink?: string | null;
   linkedinLink?: string | null;
   email?: string | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "home-page".
+ */
+export interface HomePage {
+  id: number;
+  heroHeadline: string;
+  heroDescription: string;
+  profilePicture?: (number | null) | Media;
+  projectsTitle: string;
+  projectsSubtitle: string;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "about-page".
+ */
+export interface AboutPage {
+  id: number;
+  title: string;
+  subtitle: string;
+  content?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "projects-page".
+ */
+export interface ProjectsPage {
+  id: number;
+  title: string;
+  subtitle: string;
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -401,11 +456,46 @@ export interface Profile {
  */
 export interface ProfileSelect<T extends boolean = true> {
   name?: T;
-  heroHeadline?: T;
-  bio?: T;
   githubLink?: T;
   linkedinLink?: T;
   email?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "home-page_select".
+ */
+export interface HomePageSelect<T extends boolean = true> {
+  heroHeadline?: T;
+  heroDescription?: T;
+  profilePicture?: T;
+  projectsTitle?: T;
+  projectsSubtitle?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "about-page_select".
+ */
+export interface AboutPageSelect<T extends boolean = true> {
+  title?: T;
+  subtitle?: T;
+  content?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "projects-page_select".
+ */
+export interface ProjectsPageSelect<T extends boolean = true> {
+  title?: T;
+  subtitle?: T;
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;
