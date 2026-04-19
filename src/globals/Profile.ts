@@ -23,5 +23,13 @@ export const Profile: GlobalConfig = {
       name: 'email',
       type: 'text',
     },
+    {
+      name: 'twitchLink',
+      type: 'text',
+    },
+    {
+      name: 'youtubeLink',
+      type: 'text',
+    },
   ],
 }

@@ -411,6 +411,8 @@ export interface Profile {
   githubLink?: string | null;
   linkedinLink?: string | null;
   email?: string | null;
+  twitchLink?: string | null;
+  youtubeLink?: string | null;
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -498,6 +500,8 @@ export interface ProfileSelect<T extends boolean = true> {
   githubLink?: T;
   linkedinLink?: T;
   email?: T;
+  twitchLink?: T;
+  youtubeLink?: T;
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;
