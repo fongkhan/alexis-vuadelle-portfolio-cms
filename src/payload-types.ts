@@ -425,6 +425,14 @@ export interface HomePage {
   profilePicture?: (number | null) | Media;
   projectsTitle: string;
   projectsSubtitle: string;
+  meta?: {
+    title?: string | null;
+    description?: string | null;
+    /**
+     * Maximum upload file size: 12MB. Recommended file size for images is <500KB.
+     */
+    image?: (number | null) | Media;
+  };
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -451,6 +459,14 @@ export interface AboutPage {
     };
     [k: string]: unknown;
   } | null;
+  meta?: {
+    title?: string | null;
+    description?: string | null;
+    /**
+     * Maximum upload file size: 12MB. Recommended file size for images is <500KB.
+     */
+    image?: (number | null) | Media;
+  };
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -462,6 +478,14 @@ export interface ProjectsPage {
   id: number;
   title: string;
   subtitle: string;
+  meta?: {
+    title?: string | null;
+    description?: string | null;
+    /**
+     * Maximum upload file size: 12MB. Recommended file size for images is <500KB.
+     */
+    image?: (number | null) | Media;
+  };
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -488,6 +512,13 @@ export interface HomePageSelect<T extends boolean = true> {
   profilePicture?: T;
   projectsTitle?: T;
   projectsSubtitle?: T;
+  meta?:
+    | T
+    | {
+        title?: T;
+        description?: T;
+        image?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;
@@ -500,6 +531,13 @@ export interface AboutPageSelect<T extends boolean = true> {
   title?: T;
   subtitle?: T;
   content?: T;
+  meta?:
+    | T
+    | {
+        title?: T;
+        description?: T;
+        image?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;
@@ -511,6 +549,13 @@ export interface AboutPageSelect<T extends boolean = true> {
 export interface ProjectsPageSelect<T extends boolean = true> {
   title?: T;
   subtitle?: T;
+  meta?:
+    | T
+    | {
+        title?: T;
+        description?: T;
+        image?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;

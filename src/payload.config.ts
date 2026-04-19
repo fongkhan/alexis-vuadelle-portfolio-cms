@@ -40,7 +40,7 @@ export default buildConfig({
   plugins: [
     seoPlugin({
       collections: ['projects'],
-      globals: ['homePage'],
+      globals: ['home-page', 'about-page', 'projects-page'],
       uploadsCollection: 'media',
       generateTitle: ({ doc }) => {
         return doc?.title ? `${doc.title} | Alexis Vuadelle` : 'Alexis Vuadelle | Portfolio'
