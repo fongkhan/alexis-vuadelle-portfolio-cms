@@ -12,6 +12,7 @@ import { Profile } from './globals/Profile'
 import { HomePage } from './globals/HomePage'
 import { AboutPage } from './globals/AboutPage'
 import { ProjectsPage } from './globals/ProjectsPage'
+import { seoPlugin } from '@payloadcms/plugin-seo'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -36,5 +37,27 @@ export default buildConfig({
     },
   }),
   sharp,
-  plugins: [],
+  plugins: [
+    seoPlugin({
+      collections: ['projects'],
+      globals: ['homePage'],
+      uploadsCollection: 'media',
+      generateTitle: ({ doc }) => {
+        return doc?.title ? `${doc.title} | Alexis Vuadelle` : 'Alexis Vuadelle | Portfolio'
+      },
+      generateDescription: ({ doc }) => {
+        return doc?.description || 'Portfolio of Alexis Vuadelle, Developer based in France.'
+      },
+      generateImage: ({ doc }) => {
+         return doc?.featuredImage || null
+      },
+      generateURL: ({ doc, collectionSlug }) => {
+        const url = 'https://alexis-vuadelle.com'
+        if (collectionSlug === 'projects' && doc?.slug) {
+           return `${url}/projects/${doc.slug}`
+        }
+        return url
+      }
+    })
+  ],
 })
