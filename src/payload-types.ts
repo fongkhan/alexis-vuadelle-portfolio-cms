@@ -179,6 +179,10 @@ export interface Media {
  */
 export interface Project {
   id: number;
+  /**
+   * Lower numbers appear first (e.g., 1, 2, 3...)
+   */
+  order?: number | null;
   title: string;
   slug: string;
   featuredImage?: (number | null) | Media;
@@ -339,6 +343,7 @@ export interface MediaSelect<T extends boolean = true> {
  * via the `definition` "projects_select".
  */
 export interface ProjectsSelect<T extends boolean = true> {
+  order?: T;
   title?: T;
   slug?: T;
   featuredImage?: T;

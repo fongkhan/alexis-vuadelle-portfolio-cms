@@ -4,11 +4,21 @@ export const Projects: CollectionConfig = {
   slug: 'projects',
   admin: {
     useAsTitle: 'title',
+    defaultSort: 'order',
   },
   access: {
     read: () => true,
   },
   fields: [
+    {
+      name: 'order',
+      type: 'number',
+      defaultValue: 0,
+      admin: {
+        position: 'sidebar',
+        description: 'Lower numbers appear first (e.g., 1, 2, 3...)',
+      },
+    },
     {
       name: 'title',
       type: 'text',
