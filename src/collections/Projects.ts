@@ -4,8 +4,8 @@ export const Projects: CollectionConfig = {
   slug: 'projects',
   admin: {
     useAsTitle: 'title',
-    defaultSort: 'order',
   },
+  defaultSort: 'order',
   access: {
     read: () => true,
   },
