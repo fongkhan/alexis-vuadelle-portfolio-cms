@@ -18,11 +18,6 @@ const nextConfig: NextConfig = {
 
     return webpackConfig
   },
-  experimental: {
-    workerThreads: false,
-    cpus: 1,
-    webpackMemoryOptimizations: true,
-  },
 }
 
 export default withPayload(nextConfig, { devBundleServerPackages: false })

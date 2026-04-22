@@ -38,6 +38,7 @@ export default buildConfig({
   }),
   sharp,
   plugins: [
+    /*
     seoPlugin({
       collections: ['projects'],
       globals: ['home-page', 'about-page', 'projects-page'],
@@ -59,5 +60,6 @@ export default buildConfig({
         return url
       }
     })
+    */
   ],
 })
