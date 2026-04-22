@@ -14,10 +14,10 @@ export default function NotFound() {
       textAlign: 'center',
       fontFamily: 'sans-serif'
     }}>
-      <h1>404 - Page Not Found</h1>
-      <p>The page you are looking for does not exist.</p>
-      <Link href="/" style={{ marginTop: '20px', color: '#0070f3', textDecoration: 'underline' }}>
-        Return Home
+      <h1>404 - CMS Page Not Found</h1>
+      <p>The CMS page you are looking for does not exist.</p>
+      <Link href="/admin" style={{ marginTop: '20px', color: '#0070f3', textDecoration: 'underline' }}>
+        Return to Admin
       </Link>
     </div>
   )
