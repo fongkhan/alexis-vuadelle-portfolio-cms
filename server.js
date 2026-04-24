@@ -1,8 +1,3 @@
-// Ensure Wasm memory reservation is disabled for CloudLinux/o2switch compatibility
-if (!process.env.NODE_OPTIONS?.includes('--no-wasm-memory-reservation')) {
-  process.env.NODE_OPTIONS = `${process.env.NODE_OPTIONS || ''} --no-wasm-memory-reservation`.trim()
-}
-
 import { createServer } from 'http'
 import { parse } from 'url'
 import next from 'next'
