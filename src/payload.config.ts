@@ -1,4 +1,5 @@
 import { postgresAdapter } from '@payloadcms/db-postgres'
+import { sqliteAdapter } from '@payloadcms/db-sqlite'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import path from 'path'
 import { buildConfig } from 'payload'
@@ -17,6 +18,9 @@ import { seoPlugin } from '@payloadcms/plugin-seo'
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
+const dbUri = process.env.DATABASE_URI || ''
+const isPostgres = dbUri.startsWith('postgres') || dbUri.startsWith('postgresql')
+
 export default buildConfig({
   admin: {
     user: Users.slug,
@@ -27,15 +31,21 @@ export default buildConfig({
   collections: [Users, Media, Projects],
   globals: [Profile, HomePage, AboutPage, ProjectsPage],
   editor: lexicalEditor(),
-  secret: process.env.PAYLOAD_SECRET || '',
+  secret: process.env.PAYLOAD_SECRET || 'fallback-secret-key',
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
   },
-  db: postgresAdapter({
-    pool: {
-      connectionString: process.env.DATABASE_URI || '',
-    },
-  }),
+  db: isPostgres 
+    ? postgresAdapter({
+        pool: {
+          connectionString: dbUri,
+        },
+      })
+    : sqliteAdapter({
+        client: {
+          url: dbUri || `file:${path.resolve(dirname, '../../payload.db')}`,
+        },
+      }),
   sharp,
   plugins: [
     seoPlugin({
