@@ -1,9 +1,13 @@
 import type { GlobalConfig } from 'payload'
+import { triggerWebhook } from '../hooks/triggerWebhook'
 
 export const Profile: GlobalConfig = {
   slug: 'profile',
   access: {
     read: () => true,
+  },
+  hooks: {
+    afterChange: [triggerWebhook],
   },
   fields: [
     {

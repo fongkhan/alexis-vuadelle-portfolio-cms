@@ -1,10 +1,14 @@
 import type { GlobalConfig } from 'payload'
+import { triggerWebhook } from '../hooks/triggerWebhook'
 
 export const ProjectsPage: GlobalConfig = {
   slug: 'projects-page',
   label: 'Projects Page',
   access: {
     read: () => true,
+  },
+  hooks: {
+    afterChange: [triggerWebhook],
   },
   fields: [
     {

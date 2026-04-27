@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload'
+import { triggerWebhook } from '../hooks/triggerWebhook'
 
 export const Projects: CollectionConfig = {
   slug: 'projects',
@@ -8,6 +9,10 @@ export const Projects: CollectionConfig = {
   defaultSort: 'order',
   access: {
     read: () => true,
+  },
+  hooks: {
+    afterChange: [triggerWebhook],
+    afterDelete: [triggerWebhook],
   },
   fields: [
     {
