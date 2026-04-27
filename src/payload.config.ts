@@ -1,4 +1,3 @@
-import { postgresAdapter } from '@payloadcms/db-postgres'
 import { sqliteAdapter } from '@payloadcms/db-sqlite'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import path from 'path'
@@ -19,7 +18,6 @@ const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
 const dbUri = process.env.DATABASE_URI || ''
-const isPostgres = dbUri.startsWith('postgres') || dbUri.startsWith('postgresql')
 
 export default buildConfig({
   admin: {
@@ -35,17 +33,11 @@ export default buildConfig({
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
   },
-  db: isPostgres 
-    ? postgresAdapter({
-        pool: {
-          connectionString: dbUri,
-        },
-      })
-    : sqliteAdapter({
-        client: {
-          url: dbUri || `file:${path.resolve(dirname, '../../payload.db')}`,
-        },
-      }),
+  db: sqliteAdapter({
+    client: {
+      url: dbUri || `file:${path.resolve(dirname, '../../payload.db')}`,
+    },
+  }),
   sharp,
   plugins: [
     seoPlugin({
