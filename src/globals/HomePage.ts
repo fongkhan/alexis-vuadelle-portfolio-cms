@@ -15,13 +15,13 @@ export const HomePage: GlobalConfig = {
       name: 'heroHeadline',
       type: 'text',
       required: true,
-      defaultValue: 'Building Digital Solutions',
+      defaultValue: 'Créons des projets ensemble',
     },
     {
       name: 'heroDescription',
       type: 'textarea',
       required: true,
-      defaultValue: "I'm a developer focusing on creating interactive, high-performance web applications and side projects that solve real problems.",
+      defaultValue: "Je suis développeur spécialisé dans la création d'applications web interactives et performantes, ainsi que dans le développement de projets personnels qui résolvent des problèmes concrets.",
     },
     {
       name: 'profilePicture',
@@ -32,13 +32,13 @@ export const HomePage: GlobalConfig = {
       name: 'projectsTitle',
       type: 'text',
       required: true,
-      defaultValue: 'Selected Work',
+      defaultValue: 'Projets',
     },
     {
       name: 'projectsSubtitle',
       type: 'text',
       required: true,
-      defaultValue: 'A showcase of my recent side projects and development exploits.',
+      defaultValue: 'Mes récents projets et réalisations.',
     },
   ],
 }
