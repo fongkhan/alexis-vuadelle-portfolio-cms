@@ -35,7 +35,7 @@ export default buildConfig({
   },
   db: sqliteAdapter({
     client: {
-      url: dbUri || `file:${path.resolve(dirname, '../../payload.db')}`,
+      url: dbUri || `file:${path.resolve(process.cwd(), 'payload.db')}`,
     },
   }),
   sharp,
