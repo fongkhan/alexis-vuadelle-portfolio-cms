@@ -9,6 +9,21 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Cache headers for media files served by Payload
+  async headers() {
+    return [
+      {
+        // Cache all media files for 1 year (they are immutable once uploaded)
+        source: '/api/media/file/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+    ]
+  },
   webpack: (webpackConfig) => {
     webpackConfig.resolve.extensionAlias = {
       '.cjs': ['.cts', '.cjs'],
