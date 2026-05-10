@@ -1,5 +1,6 @@
 import { sqliteAdapter } from '@payloadcms/db-sqlite'
-import { lexicalEditor } from '@payloadcms/richtext-lexical'
+import { lexicalEditor, UploadFeature } from '@payloadcms/richtext-lexical'
+
 import path from 'path'
 import { buildConfig } from 'payload'
 import { fileURLToPath } from 'url'
@@ -28,7 +29,54 @@ export default buildConfig({
   },
   collections: [Users, Media, Projects],
   globals: [Profile, HomePage, AboutPage, ProjectsPage],
-  editor: lexicalEditor(),
+  editor: lexicalEditor({
+    features: ({ defaultFeatures }) => {
+      return [
+        ...defaultFeatures.filter((f) => f.key !== 'upload'),
+        UploadFeature({
+          collections: {
+            media: {
+              fields: [
+                {
+                  name: 'position',
+                  type: 'select',
+                  options: [
+                    { label: 'Normal (Pleine largeur)', value: 'default' },
+                    { label: 'Flottant à Gauche', value: 'left' },
+                    { label: 'Flottant à Droite', value: 'right' },
+                  ],
+                  defaultValue: 'default',
+                  admin: {
+                    description: 'Position de l\'image par rapport au texte',
+                  },
+                },
+                {
+                  name: 'size',
+                  type: 'select',
+                  options: [
+                    { label: 'Petit (33%)', value: 'small' },
+                    { label: 'Moyen (50%)', value: 'medium' },
+                    { label: 'Grand (100%)', value: 'large' },
+                  ],
+                  defaultValue: 'large',
+                  admin: {
+                    description: 'Taille de l\'image (important si flottante)',
+                  },
+                },
+                {
+                  name: 'caption',
+                  type: 'text',
+                  admin: {
+                    description: 'Légende optionnelle affichée sous l\'image',
+                  },
+                },
+              ],
+            },
+          },
+        }),
+      ]
+    },
+  }),
   secret: process.env.PAYLOAD_SECRET || 'fallback-secret-key',
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
