@@ -437,6 +437,16 @@ export interface HomePage {
   profilePicture?: (number | null) | Media;
   projectsTitle: string;
   projectsSubtitle: string;
+  /**
+   * Remplace les formes floues (blobs) par une image d'arrière-plan sur tout le site.
+   */
+  siteBackgroundImage?: (number | null) | Media;
+  siteEnableParallax?: boolean | null;
+  siteParallaxRate?: number | null;
+  /**
+   * Voile blanc pour garantir la lisibilité du texte (0 = image pure, 100 = blanc complet).
+   */
+  siteBackgroundOverlayOpacity?: number | null;
   meta?: {
     title?: string | null;
     description?: string | null;
@@ -479,6 +489,10 @@ export interface AboutPage {
    * Si activé, l'image d'arrière-plan aura un effet de défilement parallaxe.
    */
   enableParallax?: boolean | null;
+  /**
+   * Vitesse de déplacement de l'image (0 = fixe, 100 = bouge avec le scroll). Valeur recommandée: 20-30.
+   */
+  parallaxRate?: number | null;
   /**
    * Ajuste la lisibilité du texte au-dessus de l'image (0 = transparent, 100 = blanc complet).
    */
@@ -538,6 +552,10 @@ export interface HomePageSelect<T extends boolean = true> {
   profilePicture?: T;
   projectsTitle?: T;
   projectsSubtitle?: T;
+  siteBackgroundImage?: T;
+  siteEnableParallax?: T;
+  siteParallaxRate?: T;
+  siteBackgroundOverlayOpacity?: T;
   meta?:
     | T
     | {
@@ -559,6 +577,7 @@ export interface AboutPageSelect<T extends boolean = true> {
   content?: T;
   backgroundImage?: T;
   enableParallax?: T;
+  parallaxRate?: T;
   backgroundOverlayOpacity?: T;
   meta?:
     | T

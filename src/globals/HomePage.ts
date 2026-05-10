@@ -40,5 +40,56 @@ export const HomePage: GlobalConfig = {
       required: true,
       defaultValue: 'Mes récents projets et réalisations.',
     },
+    {
+      type: 'tabs',
+      tabs: [
+        {
+          label: 'Arrière-plan du site',
+          fields: [
+            {
+              name: 'siteBackgroundImage',
+              label: 'Image d\'arrière-plan globale',
+              type: 'upload',
+              relationTo: 'media',
+              admin: {
+                description: 'Remplace les formes floues (blobs) par une image d\'arrière-plan sur tout le site.',
+              },
+            },
+            {
+              name: 'siteEnableParallax',
+              label: 'Activer le Parallaxe global',
+              type: 'checkbox',
+              defaultValue: false,
+              admin: {
+                condition: (data) => Boolean(data?.siteBackgroundImage),
+              },
+            },
+            {
+              name: 'siteParallaxRate',
+              label: 'Taux de Parallaxe',
+              type: 'number',
+              min: 0,
+              max: 100,
+              defaultValue: 20,
+              admin: {
+                condition: (data) => Boolean(data?.siteBackgroundImage) && Boolean(data?.siteEnableParallax),
+              },
+            },
+            {
+              name: 'siteBackgroundOverlayOpacity',
+              label: 'Opacité du voile blanc (%)',
+              type: 'number',
+              min: 0,
+              max: 100,
+              defaultValue: 80,
+              admin: {
+                description: 'Voile blanc pour garantir la lisibilité du texte (0 = image pure, 100 = blanc complet).',
+                condition: (data) => Boolean(data?.siteBackgroundImage),
+              },
+            },
+          ]
+        }
+      ]
+    }
   ],
 }
