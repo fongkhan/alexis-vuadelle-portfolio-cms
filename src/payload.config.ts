@@ -37,7 +37,6 @@ export default buildConfig({
     client: {
       url: dbUri || `file:${path.resolve(process.cwd(), 'payload.db')}`,
     },
-    push: true, // Autorise Payload à mettre à jour la BDD (ajouter des colonnes) même en production
   }),
   sharp,
   plugins: [
