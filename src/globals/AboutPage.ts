@@ -47,6 +47,18 @@ export const AboutPage: GlobalConfig = {
       },
     },
     {
+      name: 'parallaxRate',
+      label: 'Taux de Parallaxe (Vitesse)',
+      type: 'number',
+      min: 0,
+      max: 100,
+      defaultValue: 20,
+      admin: {
+        description: 'Vitesse de déplacement de l\'image (0 = fixe, 100 = bouge avec le scroll). Valeur recommandée: 20-30.',
+        condition: (data) => Boolean(data?.backgroundImage) && Boolean(data?.enableParallax),
+      },
+    },
+    {
       name: 'backgroundOverlayOpacity',
       label: 'Opacité du voile blanc (%)',
       type: 'number',
