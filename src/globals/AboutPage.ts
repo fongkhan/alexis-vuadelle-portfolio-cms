@@ -27,5 +27,36 @@ export const AboutPage: GlobalConfig = {
       name: 'content',
       type: 'richText',
     },
+    {
+      name: 'backgroundImage',
+      label: 'Image d\'arrière-plan',
+      type: 'upload',
+      relationTo: 'media',
+      admin: {
+        description: 'Image optionnelle affichée en arrière-plan de la section "About".',
+      },
+    },
+    {
+      name: 'enableParallax',
+      label: 'Activer l\'effet Parallaxe',
+      type: 'checkbox',
+      defaultValue: false,
+      admin: {
+        description: 'Si activé, l\'image d\'arrière-plan aura un effet de défilement parallaxe.',
+        condition: (data) => Boolean(data?.backgroundImage),
+      },
+    },
+    {
+      name: 'backgroundOverlayOpacity',
+      label: 'Opacité du voile blanc (%)',
+      type: 'number',
+      min: 0,
+      max: 100,
+      defaultValue: 60,
+      admin: {
+        description: 'Ajuste la lisibilité du texte au-dessus de l\'image (0 = transparent, 100 = blanc complet).',
+        condition: (data) => Boolean(data?.backgroundImage),
+      },
+    },
   ],
 }

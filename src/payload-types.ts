@@ -471,6 +471,18 @@ export interface AboutPage {
     };
     [k: string]: unknown;
   } | null;
+  /**
+   * Image optionnelle affichée en arrière-plan de la section "About".
+   */
+  backgroundImage?: (number | null) | Media;
+  /**
+   * Si activé, l'image d'arrière-plan aura un effet de défilement parallaxe.
+   */
+  enableParallax?: boolean | null;
+  /**
+   * Ajuste la lisibilité du texte au-dessus de l'image (0 = transparent, 100 = blanc complet).
+   */
+  backgroundOverlayOpacity?: number | null;
   meta?: {
     title?: string | null;
     description?: string | null;
@@ -545,6 +557,9 @@ export interface AboutPageSelect<T extends boolean = true> {
   title?: T;
   subtitle?: T;
   content?: T;
+  backgroundImage?: T;
+  enableParallax?: T;
+  backgroundOverlayOpacity?: T;
   meta?:
     | T
     | {
