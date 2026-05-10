@@ -186,6 +186,10 @@ export interface Project {
   title: string;
   slug: string;
   featuredImage?: (number | null) | Media;
+  /**
+   * Comment l'image doit s'afficher dans la carte du projet
+   */
+  imageDisplayMode?: ('cover' | 'contain') | null;
   techStack?:
     | {
         technology?: string | null;
@@ -347,6 +351,7 @@ export interface ProjectsSelect<T extends boolean = true> {
   title?: T;
   slug?: T;
   featuredImage?: T;
+  imageDisplayMode?: T;
   techStack?:
     | T
     | {

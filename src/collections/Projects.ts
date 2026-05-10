@@ -55,6 +55,18 @@ export const Projects: CollectionConfig = {
       required: false,
     },
     {
+      name: 'imageDisplayMode',
+      type: 'select',
+      options: [
+        { label: 'Cover (Remplir la zone, peut couper l\'image)', value: 'cover' },
+        { label: 'Contain (Afficher l\'image entière)', value: 'contain' },
+      ],
+      defaultValue: 'cover',
+      admin: {
+        description: 'Comment l\'image doit s\'afficher dans la carte du projet',
+      },
+    },
+    {
       name: 'techStack',
       type: 'array',
       fields: [
