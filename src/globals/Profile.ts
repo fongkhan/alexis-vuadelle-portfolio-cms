@@ -35,5 +35,14 @@ export const Profile: GlobalConfig = {
       name: 'youtubeLink',
       type: 'text',
     },
+    {
+      name: 'cvFile',
+      label: 'CV (PDF)',
+      type: 'upload',
+      relationTo: 'media',
+      admin: {
+        description: 'Uploadez votre CV au format PDF. Un bouton "Télécharger mon CV" apparaîtra sur la page d\'accueil.',
+      },
+    },
   ],
 }

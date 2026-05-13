@@ -423,6 +423,10 @@ export interface Profile {
   email?: string | null;
   twitchLink?: string | null;
   youtubeLink?: string | null;
+  /**
+   * Uploadez votre CV au format PDF. Un bouton "Télécharger mon CV" apparaîtra sur la page d'accueil.
+   */
+  cvFile?: (number | null) | Media;
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -538,6 +542,7 @@ export interface ProfileSelect<T extends boolean = true> {
   email?: T;
   twitchLink?: T;
   youtubeLink?: T;
+  cvFile?: T;
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;
