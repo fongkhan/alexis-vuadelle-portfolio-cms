@@ -58,4 +58,5 @@ yarn-error.log
 
 # Server & Passenger logs
 server-error.log
+webhook.log
 /tmp
