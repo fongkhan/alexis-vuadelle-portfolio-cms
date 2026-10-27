@@ -2,6 +2,7 @@ import dotenv from 'dotenv'
 import fs from 'fs'
 import { createServer } from 'http'
 import path from 'path'
+import util from 'util'
 import { fileURLToPath, parse } from 'url'
 import next from 'next'
 
@@ -16,16 +17,14 @@ if (!process.env.NODE_ENV) {
   process.env.NODE_ENV = 'production'
 }
 
-const port = process.env.PORT || 3000
-const dev = process.env.NODE_ENV === 'development'
-const app = next({ dev, dir: __dirname })
-const handle = app.getRequestHandler()
+const origConsoleError = console.error.bind(console)
 
-function logServerError(context, err) {
-  const timestamp = new Date().toISOString()
-  const detail = err?.stack || err?.message || String(err)
-  const entry = `[${timestamp}] [${context}] ${detail}\n\n`
-  console.error(entry)
+function writeToLogFiles(entry) {
+  try {
+    fs.appendFileSync(path.resolve(__dirname, 'server-error.log'), entry, 'utf8')
+  } catch {
+    // Ignore file logging errors
+  }
   try {
     const tmpDir = path.resolve(__dirname, 'tmp')
     if (!fs.existsSync(tmpDir)) {
@@ -36,6 +35,38 @@ function logServerError(context, err) {
     // Ignore file logging errors
   }
 }
+
+function logServerError(context, ...args) {
+  const timestamp = new Date().toISOString()
+  const detail = args
+    .map((arg) =>
+      typeof arg === 'string'
+        ? arg
+        : util.inspect(arg, { depth: 5, breakLength: 120 }),
+    )
+    .join(' ')
+  const entry = `[${timestamp}] [${context}] ${detail}\n\n`
+  origConsoleError(entry)
+  writeToLogFiles(entry)
+}
+
+// Intercept console.error so Next.js SSR / Digest errors are always written to server-error.log
+console.error = (...args) => {
+  logServerError('console.error', ...args)
+}
+
+process.on('uncaughtException', (err) => {
+  logServerError('uncaughtException', err)
+})
+
+process.on('unhandledRejection', (reason) => {
+  logServerError('unhandledRejection', reason)
+})
+
+const port = process.env.PORT || 3000
+const dev = process.env.NODE_ENV === 'development'
+const app = next({ dev, dir: __dirname })
+const handle = app.getRequestHandler()
 
 let initError = null
 let isReady = false
@@ -62,7 +93,6 @@ const server = createServer(async (req, res) => {
   }
 
   if (!isReady) {
-    // Wait briefly if request arrives while Next.js is still preparing
     for (let i = 0; i < 50 && !isReady && !initError; i++) {
       await new Promise((r) => setTimeout(r, 200))
     }

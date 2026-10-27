@@ -55,3 +55,7 @@ yarn-error.log
 # SQLite Database
 *.db
 *.db-journal
+
+# Server & Passenger logs
+server-error.log
+/tmp

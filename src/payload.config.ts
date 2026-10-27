@@ -1,4 +1,5 @@
 import dotenv from 'dotenv'
+import fs from 'fs'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { lexicalEditor, UploadFeature } from '@payloadcms/richtext-lexical'
 import { seoPlugin } from '@payloadcms/plugin-seo'
@@ -15,11 +16,33 @@ import { Profile } from './globals/Profile'
 import { HomePage } from './globals/HomePage'
 import { AboutPage } from './globals/AboutPage'
 
-const filename = fileURLToPath(import.meta.url)
-const dirname = path.dirname(filename)
+let dirname = path.resolve(process.cwd(), 'src')
+try {
+  if (typeof import.meta?.url === 'string' && import.meta.url.startsWith('file:')) {
+    dirname = path.dirname(fileURLToPath(import.meta.url))
+  }
+} catch {
+  // Fallback to process.cwd()/src when bundled in CJS
+}
 
-// Ensure .env is loaded from the CMS project root even if Passenger starts from another cwd
-dotenv.config({ path: path.resolve(dirname, '../.env') })
+// Search upward for .env so it is found even when bundled inside .next/server/app/...
+for (const envCandidate of [
+  path.resolve(process.cwd(), '.env'),
+  path.resolve(dirname, '../.env'),
+  path.resolve(dirname, '../../.env'),
+  path.resolve(dirname, '../../../.env'),
+  path.resolve(dirname, '../../../../.env'),
+  path.resolve(dirname, '../../../../../.env'),
+]) {
+  try {
+    if (fs.existsSync(envCandidate)) {
+      dotenv.config({ path: envCandidate })
+      break
+    }
+  } catch {
+    // Ignore fs errors
+  }
+}
 dotenv.config()
 
 const databaseUri =
