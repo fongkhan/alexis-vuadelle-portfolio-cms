@@ -1,5 +1,6 @@
 import type { GlobalConfig } from 'payload'
 import { triggerWebhook } from '../hooks/triggerWebhook'
+import { createBackgroundParallaxFields } from '../fields/backgroundParallaxFields'
 
 export const AboutPage: GlobalConfig = {
   slug: 'about-page',
@@ -27,48 +28,15 @@ export const AboutPage: GlobalConfig = {
       name: 'content',
       type: 'richText',
     },
-    {
-      name: 'backgroundImage',
-      label: 'Image d\'arrière-plan',
-      type: 'upload',
-      relationTo: 'media',
-      admin: {
-        description: 'Image optionnelle affichée en arrière-plan de la section "About".',
-      },
-    },
-    {
-      name: 'enableParallax',
-      label: 'Activer l\'effet Parallaxe',
-      type: 'checkbox',
-      defaultValue: false,
-      admin: {
-        description: 'Si activé, l\'image d\'arrière-plan aura un effet de défilement parallaxe.',
-        condition: (data) => Boolean(data?.backgroundImage),
-      },
-    },
-    {
-      name: 'parallaxRate',
-      label: 'Taux de Parallaxe (Vitesse)',
-      type: 'number',
-      min: 0,
-      max: 100,
-      defaultValue: 20,
-      admin: {
-        description: 'Vitesse de déplacement de l\'image (0 = fixe, 100 = bouge avec le scroll). Valeur recommandée: 20-30.',
-        condition: (data) => Boolean(data?.backgroundImage) && Boolean(data?.enableParallax),
-      },
-    },
-    {
-      name: 'backgroundOverlayOpacity',
-      label: 'Opacité du voile blanc (%)',
-      type: 'number',
-      min: 0,
-      max: 100,
-      defaultValue: 60,
-      admin: {
-        description: 'Ajuste la lisibilité du texte au-dessus de l\'image (0 = transparent, 100 = blanc complet).',
-        condition: (data) => Boolean(data?.backgroundImage),
-      },
-    },
+    ...createBackgroundParallaxFields({
+      imageFieldName: 'backgroundImage',
+      imageLabel: "Image d'arrière-plan",
+      imageDescription: 'Image optionnelle affichée en arrière-plan de la section "About".',
+      parallaxFieldName: 'enableParallax',
+      parallaxLabel: "Activer l'effet Parallaxe",
+      rateFieldName: 'parallaxRate',
+      opacityFieldName: 'backgroundOverlayOpacity',
+      defaultOpacity: 60,
+    }),
   ],
 }

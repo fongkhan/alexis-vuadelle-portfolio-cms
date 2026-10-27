@@ -142,6 +142,7 @@ export interface User {
   resetPasswordExpiration?: string | null;
   salt?: string | null;
   hash?: string | null;
+  resetPasswordRequestedAt?: string | null;
   loginAttempts?: number | null;
   lockUntil?: string | null;
   sessions?:
@@ -314,6 +315,7 @@ export interface UsersSelect<T extends boolean = true> {
   resetPasswordExpiration?: T;
   salt?: T;
   hash?: T;
+  resetPasswordRequestedAt?: T;
   loginAttempts?: T;
   lockUntil?: T;
   sessions?:
@@ -445,7 +447,13 @@ export interface HomePage {
    * Remplace les formes floues (blobs) par une image d'arrière-plan sur tout le site.
    */
   siteBackgroundImage?: (number | null) | Media;
+  /**
+   * Si activé, l'image d'arrière-plan aura un effet de défilement parallaxe.
+   */
   siteEnableParallax?: boolean | null;
+  /**
+   * Vitesse de déplacement de l'image (0 = fixe, 100 = rapide). Valeur recommandée : 20-30.
+   */
   siteParallaxRate?: number | null;
   /**
    * Voile blanc pour garantir la lisibilité du texte (0 = image pure, 100 = blanc complet).
@@ -494,11 +502,11 @@ export interface AboutPage {
    */
   enableParallax?: boolean | null;
   /**
-   * Vitesse de déplacement de l'image (0 = fixe, 100 = bouge avec le scroll). Valeur recommandée: 20-30.
+   * Vitesse de déplacement de l'image (0 = fixe, 100 = rapide). Valeur recommandée : 20-30.
    */
   parallaxRate?: number | null;
   /**
-   * Ajuste la lisibilité du texte au-dessus de l'image (0 = transparent, 100 = blanc complet).
+   * Voile blanc pour garantir la lisibilité du texte (0 = image pure, 100 = blanc complet).
    */
   backgroundOverlayOpacity?: number | null;
   meta?: {

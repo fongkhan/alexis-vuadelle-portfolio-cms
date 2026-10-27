@@ -1,5 +1,6 @@
 import type { GlobalConfig } from 'payload'
 import { triggerWebhook } from '../hooks/triggerWebhook'
+import { createBackgroundParallaxFields } from '../fields/backgroundParallaxFields'
 
 export const HomePage: GlobalConfig = {
   slug: 'home-page',
@@ -21,7 +22,8 @@ export const HomePage: GlobalConfig = {
       name: 'heroDescription',
       type: 'textarea',
       required: true,
-      defaultValue: "Je suis développeur spécialisé dans la création d'applications web interactives et performantes, ainsi que dans le développement de projets personnels qui résolvent des problèmes concrets.",
+      defaultValue:
+        "Je suis développeur spécialisé dans la création d'applications web interactives et performantes, ainsi que dans le développement de projets personnels qui résolvent des problèmes concrets.",
     },
     {
       name: 'profilePicture',
@@ -45,51 +47,19 @@ export const HomePage: GlobalConfig = {
       tabs: [
         {
           label: 'Arrière-plan du site',
-          fields: [
-            {
-              name: 'siteBackgroundImage',
-              label: 'Image d\'arrière-plan globale',
-              type: 'upload',
-              relationTo: 'media',
-              admin: {
-                description: 'Remplace les formes floues (blobs) par une image d\'arrière-plan sur tout le site.',
-              },
-            },
-            {
-              name: 'siteEnableParallax',
-              label: 'Activer le Parallaxe global',
-              type: 'checkbox',
-              defaultValue: false,
-              admin: {
-                condition: (data) => Boolean(data?.siteBackgroundImage),
-              },
-            },
-            {
-              name: 'siteParallaxRate',
-              label: 'Taux de Parallaxe',
-              type: 'number',
-              min: 0,
-              max: 100,
-              defaultValue: 20,
-              admin: {
-                condition: (data) => Boolean(data?.siteBackgroundImage) && Boolean(data?.siteEnableParallax),
-              },
-            },
-            {
-              name: 'siteBackgroundOverlayOpacity',
-              label: 'Opacité du voile blanc (%)',
-              type: 'number',
-              min: 0,
-              max: 100,
-              defaultValue: 80,
-              admin: {
-                description: 'Voile blanc pour garantir la lisibilité du texte (0 = image pure, 100 = blanc complet).',
-                condition: (data) => Boolean(data?.siteBackgroundImage),
-              },
-            },
-          ]
-        }
-      ]
-    }
+          fields: createBackgroundParallaxFields({
+            imageFieldName: 'siteBackgroundImage',
+            imageLabel: "Image d'arrière-plan globale",
+            imageDescription:
+              "Remplace les formes floues (blobs) par une image d'arrière-plan sur tout le site.",
+            parallaxFieldName: 'siteEnableParallax',
+            parallaxLabel: 'Activer le Parallaxe global',
+            rateFieldName: 'siteParallaxRate',
+            opacityFieldName: 'siteBackgroundOverlayOpacity',
+            defaultOpacity: 80,
+          }),
+        },
+      ],
+    },
   ],
 }
