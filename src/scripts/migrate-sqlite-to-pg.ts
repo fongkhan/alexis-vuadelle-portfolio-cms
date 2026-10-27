@@ -4,11 +4,6 @@ import path from 'path'
 import { getPayload } from 'payload'
 import config from '../payload.config'
 
-// Force development mode so Payload/Drizzle allows schema push even if .env has NODE_ENV=production
-;(process.env as any).NODE_ENV = 'development'
-;(process.env as any).PAYLOAD_FORCE_DRIZZLE_PUSH = 'true'
-;(process.env as any).PAYLOAD_MIGRATING = 'false'
-
 function maskDatabaseUrl(url: string): string {
   try {
     const parsed = new URL(url)
@@ -50,6 +45,14 @@ function coerceValue(val: unknown, pgDataType: string, colName: string): unknown
   return val
 }
 
+// PostgreSQL error codes for "already exists" (safe to ignore during idempotent schema sync)
+const IGNORABLE_PG_CODES = new Set([
+  '42710', // duplicate_object (type, constraint, etc.)
+  '42P07', // duplicate_table / duplicate_relation (table, index)
+  '42701', // duplicate_column
+  '42P16', // invalid_table_definition (e.g. primary key already exists)
+])
+
 export async function runSyncAndMigrate(options = { requireSqlite: false }) {
   const dbUrl =
     process.env.DATABASE_URL ||
@@ -66,20 +69,102 @@ export async function runSyncAndMigrate(options = { requireSqlite: false }) {
     throw new Error('Pool PostgreSQL introuvable sur payload.db')
   }
 
-  // Verify if schema was pushed during getPayload; if not, force pushSchema via adapter's drizzle-kit
-  const checkClient = await pool.connect()
+  const ddlClient = await pool.connect()
+  let pgVersionNum = 100000
+
   try {
-    const { rows } = await checkClient.query(
-      `SELECT to_regclass('public.users') AS users_table`,
+    const verRes = await ddlClient.query(
+      `SELECT version() AS ver, current_setting('server_version_num')::int AS ver_num`,
     )
-    if (!rows[0]?.users_table && typeof dbAdapter.requireDrizzleKit === 'function') {
-      console.log('📦 Tables absentes dans PostgreSQL, création du schéma via Drizzle...')
-      const { pushSchema } = dbAdapter.requireDrizzleKit()
-      const { apply } = await pushSchema(dbAdapter.schema, dbAdapter.drizzle)
-      await apply()
+    pgVersionNum = Number(verRes.rows[0]?.ver_num) || 100000
+    console.log(`🗄️ Serveur détecté : ${verRes.rows[0]?.ver}`)
+
+    console.log('📦 Génération du schéma SQL depuis la configuration Payload...')
+    const { generateDrizzleJson, generateMigration } = dbAdapter.requireDrizzleKit()
+    const drizzleJsonAfter = await generateDrizzleJson(dbAdapter.schema)
+    const drizzleJsonBefore = dbAdapter.defaultDrizzleSnapshot
+    const sqlStatementsUp: string[] = await generateMigration(
+      drizzleJsonBefore,
+      drizzleJsonAfter,
+    )
+
+    console.log(`⚙️ Application de ${sqlStatementsUp.length} instruction(s) DDL...`)
+    for (let stmt of sqlStatementsUp) {
+      stmt = stmt.trim()
+      if (!stmt) continue
+
+      // Fallback for PostgreSQL < 9.4 where jsonb did not exist yet
+      if (pgVersionNum < 90400) {
+        stmt = stmt.replace(/\bjsonb\b/gi, 'json')
+      }
+
+      try {
+        await ddlClient.query(stmt)
+      } catch (err: any) {
+        if (err?.code && IGNORABLE_PG_CODES.has(err.code)) {
+          // Object/table/constraint already exists -> safe to continue
+          continue
+        }
+        console.warn(`⚠️ Avertissement DDL (${err?.code || 'unknown'}) : ${err?.message}`)
+      }
+    }
+
+    // Also ensure any newly added columns on already-existing tables are created
+    if (drizzleJsonAfter?.tables) {
+      for (const tableObj of Object.values<any>(drizzleJsonAfter.tables)) {
+        const tableName = tableObj?.name
+        const columns = tableObj?.columns
+        if (!tableName || !columns) continue
+
+        const { rows: existingCols } = await ddlClient.query<{ column_name: string }>(
+          `SELECT column_name
+           FROM information_schema.columns
+           WHERE table_schema = 'public' AND table_name = $1`,
+          [tableName],
+        )
+        const existingSet = new Set(existingCols.map((c) => c.column_name))
+
+        for (const colObj of Object.values<any>(columns)) {
+          const colName = colObj?.name
+          if (!colName || existingSet.has(colName)) continue
+
+          let colType = colObj.type || 'text'
+          if (pgVersionNum < 90400 && colType.toLowerCase() === 'jsonb') {
+            colType = 'json'
+          }
+          const defaultClause =
+            colObj.default !== undefined ? ` DEFAULT ${colObj.default}` : ''
+
+          try {
+            console.log(`➕ Ajout de la colonne manquante "${tableName}"."${colName}"...`)
+            await ddlClient.query(
+              `ALTER TABLE "${tableName}" ADD COLUMN "${colName}" ${colType}${defaultClause}`,
+            )
+          } catch (err: any) {
+            if (err?.code && IGNORABLE_PG_CODES.has(err.code)) continue
+            console.warn(
+              `⚠️ Impossible d'ajouter la colonne "${tableName}"."${colName}": ${err?.message}`,
+            )
+          }
+        }
+      }
+    }
+
+    // Record dev migration marker in payload_migrations
+    try {
+      const { rows: migRows } = await ddlClient.query(
+        `SELECT id FROM "payload_migrations" WHERE batch = -1 LIMIT 1`,
+      )
+      if (migRows.length === 0) {
+        await ddlClient.query(
+          `INSERT INTO "payload_migrations" (name, batch) VALUES ('dev', -1)`,
+        )
+      }
+    } catch {
+      // Ignore if payload_migrations table is not used
     }
   } finally {
-    checkClient.release()
+    ddlClient.release()
   }
 
   console.log('✅ Schéma PostgreSQL synchronisé avec succès.')
@@ -148,7 +233,6 @@ export async function runSyncAndMigrate(options = { requireSqlite: false }) {
         continue
       }
 
-      // Discover actual columns & types in PostgreSQL for this table
       const { rows: pgCols } = await client.query<{
         column_name: string
         data_type: string
@@ -181,28 +265,45 @@ export async function runSyncAndMigrate(options = { requireSqlite: false }) {
       console.log(`📥 Migration de "${table}" (${sqliteRows.length} ligne(s))...`)
 
       for (const row of sqliteRows) {
-        // Intersect columns present in both SQLite row and PostgreSQL table
         const commonCols = Object.keys(row).filter((col) => pgColTypeMap.has(col))
         if (commonCols.length === 0) continue
 
-        const quotedCols = commonCols.map((c) => `"${c}"`).join(', ')
-        const placeholders = commonCols.map((_, idx) => `$${idx + 1}`).join(', ')
         const values = commonCols.map((col) =>
           coerceValue(row[col], pgColTypeMap.get(col) || 'text', col),
         )
 
-        const updateCols = commonCols.filter((c) => c !== 'id')
-        const conflictClause =
-          pgColTypeMap.has('id') && updateCols.length > 0
-            ? `ON CONFLICT ("id") DO UPDATE SET ${updateCols
-                .map((c) => `"${c}" = EXCLUDED."${c}"`)
-                .join(', ')}`
-            : 'ON CONFLICT DO NOTHING'
+        // Check if row with same id already exists (compatible with all PostgreSQL versions including < 9.5)
+        let exists = false
+        if (pgColTypeMap.has('id') && row.id !== undefined && row.id !== null) {
+          const checkRes = await client.query(
+            `SELECT 1 FROM "${table}" WHERE "id" = $1 LIMIT 1`,
+            [row.id],
+          )
+          exists = checkRes.rows.length > 0
+        }
 
-        await client.query(
-          `INSERT INTO "${table}" (${quotedCols}) VALUES (${placeholders}) ${conflictClause}`,
-          values,
-        )
+        if (exists) {
+          const updateCols = commonCols.filter((c) => c !== 'id')
+          if (updateCols.length > 0) {
+            const setClause = updateCols
+              .map((c, idx) => `"${c}" = $${idx + 1}`)
+              .join(', ')
+            const updateValues = updateCols.map((col) =>
+              coerceValue(row[col], pgColTypeMap.get(col) || 'text', col),
+            )
+            await client.query(
+              `UPDATE "${table}" SET ${setClause} WHERE "id" = $${updateCols.length + 1}`,
+              [...updateValues, row.id],
+            )
+          }
+        } else {
+          const quotedCols = commonCols.map((c) => `"${c}"`).join(', ')
+          const placeholders = commonCols.map((_, idx) => `$${idx + 1}`).join(', ')
+          await client.query(
+            `INSERT INTO "${table}" (${quotedCols}) VALUES (${placeholders})`,
+            values,
+          )
+        }
       }
 
       // Update PostgreSQL serial/identity sequence if table has a numeric id
@@ -231,12 +332,9 @@ export async function runSyncAndMigrate(options = { requireSqlite: false }) {
   }
 }
 
-// Run when executed directly
-const isDirectRun =
-  process.argv[1]?.endsWith('migrate-sqlite-to-pg.ts') ||
-  process.argv[1]?.endsWith('sync-db.ts')
+const isDirectRun = process.argv[1]?.endsWith('migrate-sqlite-to-pg.ts')
 
-if (isDirectRun && process.argv[1]?.endsWith('migrate-sqlite-to-pg.ts')) {
+if (isDirectRun) {
   runSyncAndMigrate({ requireSqlite: true })
     .then(() => process.exit(0))
     .catch((err) => {

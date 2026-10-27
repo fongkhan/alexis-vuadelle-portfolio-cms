@@ -87,7 +87,7 @@ export default buildConfig({
       connectionString: databaseUri,
     },
     disableCreateDatabase: true,
-    push: process.env.DB_PUSH !== 'false',
+    push: false,
   }),
   sharp,
   plugins: [
