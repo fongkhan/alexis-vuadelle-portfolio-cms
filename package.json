@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "cross-env NODE_ENV=production NODE_OPTIONS=\"--no-deprecation --max-old-space-size=8000\" next build",
+    "db:migrate-sqlite": "cross-env NODE_ENV=development NODE_OPTIONS=\"--no-deprecation --no-warnings\" tsx src/scripts/migrate-sqlite-to-pg.ts",
     "db:sync": "cross-env NODE_ENV=development NODE_OPTIONS=--no-deprecation tsx src/scripts/sync-db.ts",
     "dev": "cross-env NODE_OPTIONS=--no-deprecation next dev",
     "devsafe": "rm -rf .next && cross-env NODE_OPTIONS=--no-deprecation next dev",

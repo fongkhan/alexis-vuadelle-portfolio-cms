@@ -13,7 +13,6 @@ import { Projects } from './collections/Projects'
 import { Profile } from './globals/Profile'
 import { HomePage } from './globals/HomePage'
 import { AboutPage } from './globals/AboutPage'
-import { ProjectsPage } from './globals/ProjectsPage'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -31,7 +30,7 @@ export default buildConfig({
     },
   },
   collections: [Users, Media, Projects],
-  globals: [Profile, HomePage, AboutPage, ProjectsPage],
+  globals: [Profile, HomePage, AboutPage],
   editor: lexicalEditor({
     features: ({ defaultFeatures }) => [
       ...defaultFeatures.filter((f) => f.key !== 'upload'),
@@ -92,7 +91,7 @@ export default buildConfig({
   plugins: [
     seoPlugin({
       collections: ['projects'],
-      globals: ['home-page', 'about-page', 'projects-page'],
+      globals: ['home-page', 'about-page'],
       uploadsCollection: 'media',
       generateTitle: ({ doc }) =>
         doc?.title

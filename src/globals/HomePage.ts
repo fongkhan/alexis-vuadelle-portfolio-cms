@@ -59,6 +59,59 @@ export const HomePage: GlobalConfig = {
             defaultOpacity: 80,
           }),
         },
+        {
+          label: 'Animations & Effets',
+          fields: [
+            {
+              name: 'animationPreset',
+              label: "Style d'animations au défilement",
+              type: 'select',
+              defaultValue: 'dynamic',
+              options: [
+                {
+                  label: 'Dynamique (Flou + Zoom + Glissement fluide)',
+                  value: 'dynamic',
+                },
+                {
+                  label: 'Classique (Fondu et glissement doux)',
+                  value: 'smooth',
+                },
+                {
+                  label: 'Énergique (Effet rebond / Spring + 3D)',
+                  value: 'playful',
+                },
+                {
+                  label: 'Minimal (Animations très subtiles)',
+                  value: 'minimal',
+                },
+              ],
+              admin: {
+                description:
+                  "Définit le style global des animations d'apparition des sections et des cartes sur le site.",
+              },
+            },
+            {
+              name: 'enableCardTilt',
+              label: 'Effet 3D Tilt & Halo lumineux sur les cartes projets',
+              type: 'checkbox',
+              defaultValue: true,
+              admin: {
+                description:
+                  "Incline légèrement les cartes en 3D et affiche un halo lumineux suivant le curseur de la souris.",
+              },
+            },
+            {
+              name: 'enableScrollProgress',
+              label: 'Barre de progression de lecture en haut de page',
+              type: 'checkbox',
+              defaultValue: true,
+              admin: {
+                description:
+                  'Affiche une fine barre dégradée tout en haut de la fenêtre indiquant la progression du scroll.',
+              },
+            },
+          ],
+        },
       ],
     },
   ],

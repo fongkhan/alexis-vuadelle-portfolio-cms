@@ -59,6 +59,10 @@ npm install
 # Synchroniser automatiquement le schéma PostgreSQL (plus besoin de lancer npm run dev et faire Ctrl+C !)
 npm run db:sync
 
+# (Optionnel) Si vous avez un ancien fichier payload.db (SQLite) à la racine du CMS,
+# vous pouvez importer toutes vos données existantes (utilisateurs, médias, projets, globals) vers PostgreSQL :
+npm run db:migrate-sqlite
+
 # Compiler le CMS pour la production
 npm run build
 

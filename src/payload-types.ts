@@ -93,13 +93,11 @@ export interface Config {
     profile: Profile;
     'home-page': HomePage;
     'about-page': AboutPage;
-    'projects-page': ProjectsPage;
   };
   globalsSelect: {
     profile: ProfileSelect<false> | ProfileSelect<true>;
     'home-page': HomePageSelect<false> | HomePageSelect<true>;
     'about-page': AboutPageSelect<false> | AboutPageSelect<true>;
-    'projects-page': ProjectsPageSelect<false> | ProjectsPageSelect<true>;
   };
   locale: null;
   widgets: {
@@ -173,6 +171,32 @@ export interface Media {
   height?: number | null;
   focalX?: number | null;
   focalY?: number | null;
+  sizes?: {
+    thumbnail?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+    card?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+    hero?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+  };
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -459,6 +483,18 @@ export interface HomePage {
    * Voile blanc pour garantir la lisibilité du texte (0 = image pure, 100 = blanc complet).
    */
   siteBackgroundOverlayOpacity?: number | null;
+  /**
+   * Définit le style global des animations d'apparition des sections et des cartes sur le site.
+   */
+  animationPreset?: ('dynamic' | 'smooth' | 'playful' | 'minimal') | null;
+  /**
+   * Incline légèrement les cartes en 3D et affiche un halo lumineux suivant le curseur de la souris.
+   */
+  enableCardTilt?: boolean | null;
+  /**
+   * Affiche une fine barre dégradée tout en haut de la fenêtre indiquant la progression du scroll.
+   */
+  enableScrollProgress?: boolean | null;
   meta?: {
     title?: string | null;
     description?: string | null;
@@ -522,25 +558,6 @@ export interface AboutPage {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "projects-page".
- */
-export interface ProjectsPage {
-  id: number;
-  title: string;
-  subtitle: string;
-  meta?: {
-    title?: string | null;
-    description?: string | null;
-    /**
-     * Maximum upload file size: 12MB. Recommended file size for images is <500KB.
-     */
-    image?: (number | null) | Media;
-  };
-  updatedAt?: string | null;
-  createdAt?: string | null;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "profile_select".
  */
 export interface ProfileSelect<T extends boolean = true> {
@@ -569,6 +586,9 @@ export interface HomePageSelect<T extends boolean = true> {
   siteEnableParallax?: T;
   siteParallaxRate?: T;
   siteBackgroundOverlayOpacity?: T;
+  animationPreset?: T;
+  enableCardTilt?: T;
+  enableScrollProgress?: T;
   meta?:
     | T
     | {
@@ -592,24 +612,6 @@ export interface AboutPageSelect<T extends boolean = true> {
   enableParallax?: T;
   parallaxRate?: T;
   backgroundOverlayOpacity?: T;
-  meta?:
-    | T
-    | {
-        title?: T;
-        description?: T;
-        image?: T;
-      };
-  updatedAt?: T;
-  createdAt?: T;
-  globalType?: T;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "projects-page_select".
- */
-export interface ProjectsPageSelect<T extends boolean = true> {
-  title?: T;
-  subtitle?: T;
   meta?:
     | T
     | {
