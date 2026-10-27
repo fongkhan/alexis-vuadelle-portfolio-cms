@@ -1,7 +1,6 @@
 import 'dotenv/config'
 import fs from 'fs'
 import path from 'path'
-import { pushDevSchema } from '@payloadcms/drizzle'
 import { getPayload } from 'payload'
 import config from '../payload.config'
 
@@ -67,15 +66,17 @@ export async function runSyncAndMigrate(options = { requireSqlite: false }) {
     throw new Error('Pool PostgreSQL introuvable sur payload.db')
   }
 
-  // Verify if schema was pushed during getPayload; if not, force pushDevSchema
+  // Verify if schema was pushed during getPayload; if not, force pushSchema via adapter's drizzle-kit
   const checkClient = await pool.connect()
   try {
     const { rows } = await checkClient.query(
       `SELECT to_regclass('public.users') AS users_table`,
     )
-    if (!rows[0]?.users_table) {
+    if (!rows[0]?.users_table && typeof dbAdapter.requireDrizzleKit === 'function') {
       console.log('📦 Tables absentes dans PostgreSQL, création du schéma via Drizzle...')
-      await pushDevSchema(dbAdapter)
+      const { pushSchema } = dbAdapter.requireDrizzleKit()
+      const { apply } = await pushSchema(dbAdapter.schema, dbAdapter.drizzle)
+      await apply()
     }
   } finally {
     checkClient.release()
