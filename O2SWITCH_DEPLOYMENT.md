@@ -7,15 +7,15 @@ Puisque nous utilisons Phusion Passenger et PostgreSQL intégrés à o2switch, v
 ## 1. Créer la base de données PostgreSQL sur o2switch (cPanel)
 
 1. Connectez-vous à votre **cPanel o2switch** et ouvrez l'outil **Bases de données PostgreSQL** (PostgreSQL Databases).
-2. Créez une nouvelle base de données (ex: `fongkhan_portfolio`).
+2. Créez une nouvelle base de données (ex: `fongkhan_alexis_vuadelle`).
 3. Créez un utilisateur PostgreSQL (ex: `fongkhan_pguser`) avec un mot de passe fort.
-4. **Important** : Dans la section *"Ajouter un utilisateur à la base de données"*, associez l'utilisateur `fongkhan_pguser` à la base `fongkhan_portfolio`.
+4. **Important** : Dans la section *"Ajouter un utilisateur à la base de données"*, associez l'utilisateur `fongkhan_pguser` à la base `fongkhan_alexis_vuadelle`.
 
 Votre URI de connexion sera alors :
 ```env
-DATABASE_URI=postgresql://fongkhan_pguser:VOTRE_MOT_DE_PASSE@127.0.0.1:5432/fongkhan_portfolio
+DATABASE_URL=postgresql://fongkhan_pguser:VOTRE_MOT_DE_PASSE@127.0.0.1:5432/fongkhan_alexis_vuadelle
 ```
-*(Si votre mot de passe contient des caractères spéciaux comme `@`, `#`, `/`, encodez-les en URL ou utilisez un mot de passe alphanumérique).*
+*(Si votre mot de passe contient des caractères spéciaux comme `@`, `#`, `/`, `:`, `%`, encodez-les en URL — ex: `@` devient `%40` — ou utilisez un mot de passe alphanumérique).*
 
 ---
 
@@ -26,11 +26,11 @@ cd /home/fongkhan/repositories/alexis-vuadelle-portfolio-cms
 nano .env
 ```
 
-Mettez le contenu suivant :
+Mettez le contenu suivant (assurez-vous de ne **pas** laisser une ancienne variable `DATABASE_URI` qui pointe vers `portfolio`) :
 
 ```env
 NODE_ENV=production
-DATABASE_URI=postgresql://fongkhan_pguser:VOTRE_MOT_DE_PASSE@127.0.0.1:5432/fongkhan_portfolio
+DATABASE_URL=postgresql://fongkhan_pguser:VOTRE_MOT_DE_PASSE@127.0.0.1:5432/fongkhan_alexis_vuadelle
 PAYLOAD_SECRET=votre_cle_secrete_hyper_longue_et_aleatoire
 PAYLOAD_PUBLIC_SERVER_URL=https://cms.alexis-vuadelle.com
 WEBHOOK_URL=https://alexis-vuadelle.com/webhook-payload.php

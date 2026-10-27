@@ -1,18 +1,10 @@
-import 'dotenv/config'
-import { getPayload } from 'payload'
-import config from '../payload.config'
+import { runSyncAndMigrate } from './migrate-sqlite-to-pg'
 
-async function syncDb() {
-  console.log('Synchronizing PostgreSQL database schema...')
-  const payload = await getPayload({ config })
-  if (typeof payload.db?.destroy === 'function') {
-    await payload.db.destroy()
-  }
-  console.log('Database schema synchronized successfully!')
-  process.exit(0)
-}
-
-syncDb().catch((err) => {
-  console.error('Database sync failed:', err)
-  process.exit(1)
-})
+runSyncAndMigrate({ requireSqlite: false })
+  .then(() => {
+    process.exit(0)
+  })
+  .catch((err) => {
+    console.error('❌ Échec de la synchronisation PostgreSQL :', err)
+    process.exit(1)
+  })

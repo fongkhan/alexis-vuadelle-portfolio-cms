@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { lexicalEditor, UploadFeature } from '@payloadcms/richtext-lexical'
 import { seoPlugin } from '@payloadcms/plugin-seo'
@@ -18,8 +19,8 @@ const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
 const databaseUri =
-  process.env.DATABASE_URI ||
   process.env.DATABASE_URL ||
+  process.env.DATABASE_URI ||
   'postgresql://postgres:postgres@127.0.0.1:5432/portfolio'
 
 export default buildConfig({
@@ -85,6 +86,7 @@ export default buildConfig({
     pool: {
       connectionString: databaseUri,
     },
+    disableCreateDatabase: true,
     push: process.env.DB_PUSH !== 'false',
   }),
   sharp,

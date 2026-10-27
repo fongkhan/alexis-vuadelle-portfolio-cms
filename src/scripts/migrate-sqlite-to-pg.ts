@@ -1,306 +1,223 @@
 import 'dotenv/config'
 import fs from 'fs'
 import path from 'path'
-import { DatabaseSync } from 'node:sqlite'
+import { pushDevSchema } from '@payloadcms/drizzle'
 import { getPayload } from 'payload'
 import config from '../payload.config'
 
-function toBool(val: unknown, fallback = false): boolean {
-  if (val === null || val === undefined) return fallback
-  return Boolean(Number(val))
+// Force development mode so Payload/Drizzle allows schema push even if .env has NODE_ENV=production
+;(process.env as any).NODE_ENV = 'development'
+;(process.env as any).PAYLOAD_FORCE_DRIZZLE_PUSH = 'true'
+;(process.env as any).PAYLOAD_MIGRATING = 'false'
+
+function maskDatabaseUrl(url: string): string {
+  try {
+    const parsed = new URL(url)
+    if (parsed.password) {
+      parsed.password = '***'
+    }
+    return parsed.toString()
+  } catch {
+    return url.replace(/:([^:@]+)@/, ':***@')
+  }
 }
 
-function toJson(val: unknown): unknown {
-  if (!val) return null
-  if (typeof val === 'string') {
-    try {
-      return JSON.parse(val)
-    } catch {
-      return null
+function coerceValue(val: unknown, pgDataType: string, colName: string): unknown {
+  if (val === undefined || val === null) {
+    if (colName === 'created_at' || colName === 'updated_at') {
+      return new Date().toISOString()
     }
+    return null
   }
+
+  if (pgDataType === 'boolean') {
+    if (typeof val === 'boolean') return val
+    if (typeof val === 'number') return val !== 0
+    if (typeof val === 'string') return val === '1' || val.toLowerCase() === 'true'
+    return Boolean(val)
+  }
+
+  if (pgDataType === 'json' || pgDataType === 'jsonb') {
+    if (typeof val === 'string') {
+      try {
+        return JSON.parse(val)
+      } catch {
+        return null
+      }
+    }
+    return val
+  }
+
   return val
 }
 
-async function migrateSqliteToPostgres() {
-  const sqlitePath =
-    process.env.SQLITE_PATH || path.resolve(process.cwd(), 'payload.db')
+export async function runSyncAndMigrate(options = { requireSqlite: false }) {
+  const dbUrl =
+    process.env.DATABASE_URL ||
+    process.env.DATABASE_URI ||
+    'postgresql://postgres:postgres@127.0.0.1:5432/portfolio'
 
-  if (!fs.existsSync(sqlitePath)) {
-    console.error(`Fichier SQLite introuvable : ${sqlitePath}`)
-    console.error(
-      'Astuce : placez votre fichier payload.db à la racine du CMS ou définissez SQLITE_PATH=/chemin/vers/payload.db',
-    )
-    process.exit(1)
-  }
+  console.log(`🔌 Connexion à PostgreSQL : ${maskDatabaseUrl(dbUrl)}`)
 
-  console.log(`Lecture de la base SQLite : ${sqlitePath}`)
-  const sqlite = new DatabaseSync(sqlitePath, { open: true })
-
-  console.log('Connexion à PostgreSQL et synchronisation du schéma Payload...')
   const payload = await getPayload({ config })
-  const pool = (payload.db as any).pool
+  const dbAdapter = payload.db as any
+  const pool = dbAdapter.pool
 
   if (!pool) {
     throw new Error('Pool PostgreSQL introuvable sur payload.db')
   }
 
+  // Verify if schema was pushed during getPayload; if not, force pushDevSchema
+  const checkClient = await pool.connect()
+  try {
+    const { rows } = await checkClient.query(
+      `SELECT to_regclass('public.users') AS users_table`,
+    )
+    if (!rows[0]?.users_table) {
+      console.log('📦 Tables absentes dans PostgreSQL, création du schéma via Drizzle...')
+      await pushDevSchema(dbAdapter)
+    }
+  } finally {
+    checkClient.release()
+  }
+
+  console.log('✅ Schéma PostgreSQL synchronisé avec succès.')
+
+  const sqlitePath =
+    process.env.SQLITE_PATH || path.resolve(process.cwd(), 'payload.db')
+
+  if (!fs.existsSync(sqlitePath)) {
+    if (options.requireSqlite) {
+      console.warn(`⚠️ Fichier SQLite introuvable à l'emplacement : ${sqlitePath}`)
+      console.warn(
+        'Le schéma PostgreSQL est bien créé, mais aucune donnée SQLite locale n’a pu être importée (car payload.db n’est pas présent dans ce dossier).',
+      )
+    }
+    if (typeof payload.db?.destroy === 'function') {
+      await payload.db.destroy()
+    }
+    return
+  }
+
+  console.log(`📂 Fichier SQLite détecté (${sqlitePath}), démarrage de l'import des données...`)
+
+  let DatabaseSync: any
+  try {
+    const sqliteMod = await import('node:sqlite')
+    DatabaseSync = sqliteMod.DatabaseSync
+  } catch (err) {
+    console.error(
+      '❌ Impossible de charger le module natif node:sqlite (nécessite Node.js >= 22.5) :',
+      err,
+    )
+    if (typeof payload.db?.destroy === 'function') {
+      await payload.db.destroy()
+    }
+    process.exit(1)
+  }
+
+  const sqlite = new DatabaseSync(sqlitePath, { open: true })
   const client = await pool.connect()
+
+  // Ordered to respect foreign key constraints (media before projects/globals)
+  const tablesToMigrate = [
+    'users',
+    'media',
+    'projects',
+    'projects_tech_stack',
+    'profile',
+    'home_page',
+    'about_page',
+  ]
 
   try {
     await client.query('BEGIN')
 
-    // 1. Users
-    const users = sqlite.prepare('SELECT * FROM users').all() as any[]
-    console.log(`Migration de ${users.length} utilisateur(s)...`)
-    for (const u of users) {
-      await client.query(
-        `INSERT INTO users (id, email, salt, hash, login_attempts, lock_until, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-         ON CONFLICT (id) DO UPDATE SET
-           email = EXCLUDED.email,
-           salt = EXCLUDED.salt,
-           hash = EXCLUDED.hash,
-           updated_at = EXCLUDED.updated_at`,
-        [
-          u.id,
-          u.email,
-          u.salt,
-          u.hash,
-          u.login_attempts ?? 0,
-          u.lock_until,
-          u.created_at || new Date().toISOString(),
-          u.updated_at || new Date().toISOString(),
-        ],
-      )
-    }
+    const sqliteTables = new Set(
+      (
+        sqlite
+          .prepare("SELECT name FROM sqlite_master WHERE type='table'")
+          .all() as Array<{ name: string }>
+      ).map((r) => r.name),
+    )
 
-    // 2. Media
-    const mediaRows = sqlite.prepare('SELECT * FROM media').all() as any[]
-    console.log(`Migration de ${mediaRows.length} média(s)...`)
-    for (const m of mediaRows) {
-      await client.query(
-        `INSERT INTO media (id, alt, url, thumbnail_u_r_l, filename, mime_type, filesize, width, height, focal_x, focal_y, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-         ON CONFLICT (id) DO UPDATE SET
-           alt = EXCLUDED.alt,
-           url = EXCLUDED.url,
-           filename = EXCLUDED.filename,
-           mime_type = EXCLUDED.mime_type,
-           filesize = EXCLUDED.filesize,
-           width = EXCLUDED.width,
-           height = EXCLUDED.height,
-           updated_at = EXCLUDED.updated_at`,
-        [
-          m.id,
-          m.alt || m.filename || 'Media',
-          m.url,
-          m.thumbnail_u_r_l,
-          m.filename,
-          m.mime_type,
-          m.filesize,
-          m.width,
-          m.height,
-          m.focal_x ?? 50,
-          m.focal_y ?? 50,
-          m.created_at || new Date().toISOString(),
-          m.updated_at || new Date().toISOString(),
-        ],
-      )
-    }
+    for (const table of tablesToMigrate) {
+      if (!sqliteTables.has(table)) {
+        console.log(`⏭️ Table "${table}" absente dans SQLite, ignorée.`)
+        continue
+      }
 
-    // 3. Projects
-    const projects = sqlite.prepare('SELECT * FROM projects').all() as any[]
-    console.log(`Migration de ${projects.length} projet(s)...`)
-    for (const p of projects) {
-      await client.query(
-        `INSERT INTO projects (
-           id, "order", title, slug, featured_image_id, image_display_mode,
-           github_url, live_url, content, meta_title, meta_description, meta_image_id,
-           created_at, updated_at
-         )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-         ON CONFLICT (id) DO UPDATE SET
-           "order" = EXCLUDED."order",
-           title = EXCLUDED.title,
-           slug = EXCLUDED.slug,
-           featured_image_id = EXCLUDED.featured_image_id,
-           image_display_mode = EXCLUDED.image_display_mode,
-           github_url = EXCLUDED.github_url,
-           live_url = EXCLUDED.live_url,
-           content = EXCLUDED.content,
-           meta_title = EXCLUDED.meta_title,
-           meta_description = EXCLUDED.meta_description,
-           meta_image_id = EXCLUDED.meta_image_id,
-           updated_at = EXCLUDED.updated_at`,
-        [
-          p.id,
-          p.order ?? 0,
-          p.title,
-          p.slug,
-          p.featured_image_id,
-          p.image_display_mode || 'cover',
-          p.github_url,
-          p.live_url,
-          toJson(p.content),
-          p.meta_title,
-          p.meta_description,
-          p.meta_image_id,
-          p.created_at || new Date().toISOString(),
-          p.updated_at || new Date().toISOString(),
-        ],
+      // Discover actual columns & types in PostgreSQL for this table
+      const { rows: pgCols } = await client.query<{
+        column_name: string
+        data_type: string
+      }>(
+        `SELECT column_name, data_type
+         FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = $1`,
+        [table],
       )
-    }
 
-    // 4. Projects Tech Stack
-    const techStack = sqlite
-      .prepare('SELECT * FROM projects_tech_stack')
-      .all() as any[]
-    if (techStack.length > 0) {
-      console.log(`Migration de ${techStack.length} tag(s) technos...`)
-      for (const t of techStack) {
-        await client.query(
-          `INSERT INTO projects_tech_stack (_order, _parent_id, id, technology)
-           VALUES ($1, $2, $3, $4)
-           ON CONFLICT (id) DO UPDATE SET
-             _order = EXCLUDED._order,
-             technology = EXCLUDED.technology`,
-          [t._order, t._parent_id, String(t.id), t.technology],
+      if (pgCols.length === 0) {
+        console.log(`⏭️ Table "${table}" absente dans PostgreSQL, ignorée.`)
+        continue
+      }
+
+      const pgColTypeMap = new Map<string, string>(
+        pgCols.map((c) => [c.column_name, c.data_type]),
+      )
+
+      const sqliteRows = sqlite.prepare(`SELECT * FROM "${table}"`).all() as Record<
+        string,
+        unknown
+      >[]
+
+      if (sqliteRows.length === 0) {
+        console.log(`ℹ️ Table "${table}" : 0 ligne dans SQLite.`)
+        continue
+      }
+
+      console.log(`📥 Migration de "${table}" (${sqliteRows.length} ligne(s))...`)
+
+      for (const row of sqliteRows) {
+        // Intersect columns present in both SQLite row and PostgreSQL table
+        const commonCols = Object.keys(row).filter((col) => pgColTypeMap.has(col))
+        if (commonCols.length === 0) continue
+
+        const quotedCols = commonCols.map((c) => `"${c}"`).join(', ')
+        const placeholders = commonCols.map((_, idx) => `$${idx + 1}`).join(', ')
+        const values = commonCols.map((col) =>
+          coerceValue(row[col], pgColTypeMap.get(col) || 'text', col),
         )
+
+        const updateCols = commonCols.filter((c) => c !== 'id')
+        const conflictClause =
+          pgColTypeMap.has('id') && updateCols.length > 0
+            ? `ON CONFLICT ("id") DO UPDATE SET ${updateCols
+                .map((c) => `"${c}" = EXCLUDED."${c}"`)
+                .join(', ')}`
+            : 'ON CONFLICT DO NOTHING'
+
+        await client.query(
+          `INSERT INTO "${table}" (${quotedCols}) VALUES (${placeholders}) ${conflictClause}`,
+          values,
+        )
+      }
+
+      // Update PostgreSQL serial/identity sequence if table has a numeric id
+      if (pgColTypeMap.get('id') === 'integer' || pgColTypeMap.get('id') === 'bigint') {
+        await client.query(`
+          SELECT setval(
+            pg_get_serial_sequence('${table}', 'id'),
+            COALESCE((SELECT MAX(id) FROM "${table}"), 1),
+            (SELECT COUNT(*) > 0 FROM "${table}")
+          )
+        `)
       }
     }
 
-    // 5. Global: Profile
-    const profiles = sqlite.prepare('SELECT * FROM profile').all() as any[]
-    for (const prof of profiles) {
-      console.log('Migration du global Profile...')
-      await client.query(
-        `INSERT INTO profile (id, name, github_link, linkedin_link, email, twitch_link, youtube_link, cv_file_id, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-         ON CONFLICT (id) DO UPDATE SET
-           name = EXCLUDED.name,
-           github_link = EXCLUDED.github_link,
-           linkedin_link = EXCLUDED.linkedin_link,
-           email = EXCLUDED.email,
-           twitch_link = EXCLUDED.twitch_link,
-           youtube_link = EXCLUDED.youtube_link,
-           cv_file_id = EXCLUDED.cv_file_id,
-           updated_at = EXCLUDED.updated_at`,
-        [
-          prof.id,
-          prof.name,
-          prof.github_link,
-          prof.linkedin_link,
-          prof.email,
-          prof.twitch_link,
-          prof.youtube_link,
-          prof.cv_file_id,
-          prof.created_at || new Date().toISOString(),
-          prof.updated_at || new Date().toISOString(),
-        ],
-      )
-    }
-
-    // 6. Global: HomePage
-    const homePages = sqlite.prepare('SELECT * FROM home_page').all() as any[]
-    for (const hp of homePages) {
-      console.log('Migration du global HomePage...')
-      await client.query(
-        `INSERT INTO home_page (
-           id, hero_headline, hero_description, profile_picture_id,
-           projects_title, projects_subtitle, site_background_image_id,
-           site_enable_parallax, site_parallax_rate, site_background_overlay_opacity,
-           meta_title, meta_description, meta_image_id, created_at, updated_at
-         )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-         ON CONFLICT (id) DO UPDATE SET
-           hero_headline = EXCLUDED.hero_headline,
-           hero_description = EXCLUDED.hero_description,
-           profile_picture_id = EXCLUDED.profile_picture_id,
-           projects_title = EXCLUDED.projects_title,
-           projects_subtitle = EXCLUDED.projects_subtitle,
-           site_background_image_id = EXCLUDED.site_background_image_id,
-           site_enable_parallax = EXCLUDED.site_enable_parallax,
-           site_parallax_rate = EXCLUDED.site_parallax_rate,
-           site_background_overlay_opacity = EXCLUDED.site_background_overlay_opacity,
-           meta_title = EXCLUDED.meta_title,
-           meta_description = EXCLUDED.meta_description,
-           meta_image_id = EXCLUDED.meta_image_id,
-           updated_at = EXCLUDED.updated_at`,
-        [
-          hp.id,
-          hp.hero_headline,
-          hp.hero_description,
-          hp.profile_picture_id,
-          hp.projects_title || 'Projets',
-          hp.projects_subtitle || 'Mes récents projets et réalisations.',
-          hp.site_background_image_id,
-          toBool(hp.site_enable_parallax, false),
-          hp.site_parallax_rate ?? 20,
-          hp.site_background_overlay_opacity ?? 80,
-          hp.meta_title,
-          hp.meta_description,
-          hp.meta_image_id,
-          hp.created_at || new Date().toISOString(),
-          hp.updated_at || new Date().toISOString(),
-        ],
-      )
-    }
-
-    // 7. Global: AboutPage
-    const aboutPages = sqlite.prepare('SELECT * FROM about_page').all() as any[]
-    for (const ap of aboutPages) {
-      console.log('Migration du global AboutPage...')
-      await client.query(
-        `INSERT INTO about_page (
-           id, title, subtitle, content, background_image_id,
-           enable_parallax, parallax_rate, background_overlay_opacity,
-           meta_title, meta_description, meta_image_id, created_at, updated_at
-         )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-         ON CONFLICT (id) DO UPDATE SET
-           title = EXCLUDED.title,
-           subtitle = EXCLUDED.subtitle,
-           content = EXCLUDED.content,
-           background_image_id = EXCLUDED.background_image_id,
-           enable_parallax = EXCLUDED.enable_parallax,
-           parallax_rate = EXCLUDED.parallax_rate,
-           background_overlay_opacity = EXCLUDED.background_overlay_opacity,
-           meta_title = EXCLUDED.meta_title,
-           meta_description = EXCLUDED.meta_description,
-           meta_image_id = EXCLUDED.meta_image_id,
-           updated_at = EXCLUDED.updated_at`,
-        [
-          ap.id,
-          ap.title,
-          ap.subtitle,
-          toJson(ap.content),
-          ap.background_image_id,
-          toBool(ap.enable_parallax, false),
-          ap.parallax_rate ?? 20,
-          ap.background_overlay_opacity ?? 60,
-          ap.meta_title,
-          ap.meta_description,
-          ap.meta_image_id,
-          ap.created_at || new Date().toISOString(),
-          ap.updated_at || new Date().toISOString(),
-        ],
-      )
-    }
-
-    // Reset PostgreSQL serial sequences so future inserts don't collide on ID
-    for (const table of ['users', 'media', 'projects', 'profile', 'home_page', 'about_page']) {
-      await client.query(`
-        SELECT setval(
-          pg_get_serial_sequence('${table}', 'id'),
-          COALESCE((SELECT MAX(id) FROM ${table}), 1),
-          (SELECT COUNT(*) > 0 FROM ${table})
-        )
-      `)
-    }
-
     await client.query('COMMIT')
-    console.log('✅ Migration SQLite -> PostgreSQL terminée avec succès !')
+    console.log('🎉 Migration SQLite -> PostgreSQL terminée avec succès !')
   } catch (err) {
     await client.query('ROLLBACK')
     throw err
@@ -313,7 +230,16 @@ async function migrateSqliteToPostgres() {
   }
 }
 
-migrateSqliteToPostgres().catch((err) => {
-  console.error('❌ Échec de la migration SQLite -> PostgreSQL :', err)
-  process.exit(1)
-})
+// Run when executed directly
+const isDirectRun =
+  process.argv[1]?.endsWith('migrate-sqlite-to-pg.ts') ||
+  process.argv[1]?.endsWith('sync-db.ts')
+
+if (isDirectRun && process.argv[1]?.endsWith('migrate-sqlite-to-pg.ts')) {
+  runSyncAndMigrate({ requireSqlite: true })
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error('❌ Échec de la migration SQLite -> PostgreSQL :', err)
+      process.exit(1)
+    })
+}
