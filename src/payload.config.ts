@@ -1,4 +1,4 @@
-import 'dotenv/config'
+import dotenv from 'dotenv'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { lexicalEditor, UploadFeature } from '@payloadcms/richtext-lexical'
 import { seoPlugin } from '@payloadcms/plugin-seo'
@@ -17,6 +17,10 @@ import { AboutPage } from './globals/AboutPage'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
+
+// Ensure .env is loaded from the CMS project root even if Passenger starts from another cwd
+dotenv.config({ path: path.resolve(dirname, '../.env') })
+dotenv.config()
 
 const databaseUri =
   process.env.DATABASE_URL ||

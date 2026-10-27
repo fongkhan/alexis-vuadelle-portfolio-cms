@@ -390,6 +390,18 @@ export async function runSyncAndMigrate(options = { requireSqlite: false }) {
     throw err
   } finally {
     client.release()
+  }
+
+  // Self-test Payload Local API queries against PostgreSQL
+  try {
+    const usersCheck = await payload.find({ collection: 'users', limit: 1 })
+    const projectsCheck = await payload.find({ collection: 'projects', limit: 5 })
+    console.log(
+      `🔍 Vérification Payload API OK : ${usersCheck.totalDocs} utilisateur(s), ${projectsCheck.totalDocs} projet(s) dans PostgreSQL.`,
+    )
+  } catch (verifyErr) {
+    console.warn('⚠️ Avertissement lors de la vérification Payload API :', verifyErr)
+  } finally {
     if (typeof payload.db?.destroy === 'function') {
       await payload.db.destroy()
     }
