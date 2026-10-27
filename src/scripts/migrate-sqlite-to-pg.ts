@@ -1,4 +1,5 @@
 import 'dotenv/config'
+import { execFileSync } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 import { getPayload } from 'payload'
@@ -43,6 +44,98 @@ function coerceValue(val: unknown, pgDataType: string, colName: string): unknown
   }
 
   return val
+}
+
+/**
+ * Reads all tables and rows from a SQLite database file using whichever engine is available on the system:
+ * 1. Node built-in `node:sqlite` (if compiled in)
+ * 2. Python 3 standard library `sqlite3` (pre-installed on CloudLinux / o2switch / Linux)
+ * 3. `sqlite3 -json` CLI
+ */
+async function readSqliteDatabase(
+  sqlitePath: string,
+): Promise<Record<string, Record<string, unknown>[]>> {
+  // 1. Try node:sqlite
+  try {
+    const sqliteMod = await import('node:sqlite')
+    const db = new sqliteMod.DatabaseSync(sqlitePath, { open: true })
+    try {
+      const tables = (
+        db
+          .prepare("SELECT name FROM sqlite_master WHERE type='table'")
+          .all() as Array<{ name: string }>
+      ).map((r) => r.name)
+      const data: Record<string, Record<string, unknown>[]> = {}
+      for (const t of tables) {
+        data[t] = db.prepare(`SELECT * FROM "${t}"`).all() as Record<string, unknown>[]
+      }
+      return data
+    } finally {
+      db.close()
+    }
+  } catch {
+    // Fallback to Python or sqlite3 CLI
+  }
+
+  // 2. Try python3 / python (always available on RedHat / CloudLinux / o2switch)
+  const pyScript = `
+import sqlite3, json, sys
+conn = sqlite3.connect(sys.argv[1])
+conn.row_factory = sqlite3.Row
+cur = conn.cursor()
+tables = [r[0] for r in cur.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+data = {}
+for t in tables:
+    rows = []
+    for row in cur.execute('SELECT * FROM "' + t.replace('"', '""') + '"').fetchall():
+        d = {}
+        for k in row.keys():
+            v = row[k]
+            if isinstance(v, bytes):
+                v = v.decode('utf-8', errors='replace')
+            d[k] = v
+        rows.append(d)
+    data[t] = rows
+print(json.dumps(data))
+`
+  for (const pyBin of ['python3', 'python']) {
+    try {
+      const stdout = execFileSync(pyBin, ['-c', pyScript, sqlitePath], {
+        encoding: 'utf8',
+        maxBuffer: 50 * 1024 * 1024,
+      })
+      return JSON.parse(stdout)
+    } catch {
+      // Try next binary
+    }
+  }
+
+  // 3. Try sqlite3 CLI
+  try {
+    const tablesOut = execFileSync(
+      'sqlite3',
+      [sqlitePath, "SELECT name FROM sqlite_master WHERE type='table';"],
+      { encoding: 'utf8' },
+    )
+    const tables = tablesOut
+      .split(/\r?\n/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+    const data: Record<string, Record<string, unknown>[]> = {}
+    for (const t of tables) {
+      const rowsJson = execFileSync(
+        'sqlite3',
+        ['-json', sqlitePath, `SELECT * FROM "${t}";`],
+        { encoding: 'utf8', maxBuffer: 50 * 1024 * 1024 },
+      ).trim()
+      data[t] = rowsJson ? JSON.parse(rowsJson) : []
+    }
+    return data
+  } catch (err) {
+    throw new Error(
+      `Impossible de lire ${sqlitePath} (ni node:sqlite, ni python3, ni sqlite3 CLI disponibles): ${err}`,
+    )
+  }
 }
 
 // PostgreSQL error codes for "already exists" (safe to ignore during idempotent schema sync)
@@ -102,7 +195,6 @@ export async function runSyncAndMigrate(options = { requireSqlite: false }) {
         await ddlClient.query(stmt)
       } catch (err: any) {
         if (err?.code && IGNORABLE_PG_CODES.has(err.code)) {
-          // Object/table/constraint already exists -> safe to continue
           continue
         }
         console.warn(`⚠️ Avertissement DDL (${err?.code || 'unknown'}) : ${err?.message}`)
@@ -187,22 +279,7 @@ export async function runSyncAndMigrate(options = { requireSqlite: false }) {
 
   console.log(`📂 Fichier SQLite détecté (${sqlitePath}), démarrage de l'import des données...`)
 
-  let DatabaseSync: any
-  try {
-    const sqliteMod = await import('node:sqlite')
-    DatabaseSync = sqliteMod.DatabaseSync
-  } catch (err) {
-    console.error(
-      '❌ Impossible de charger le module natif node:sqlite (nécessite Node.js >= 22.5) :',
-      err,
-    )
-    if (typeof payload.db?.destroy === 'function') {
-      await payload.db.destroy()
-    }
-    process.exit(1)
-  }
-
-  const sqlite = new DatabaseSync(sqlitePath, { open: true })
+  const sqliteData = await readSqliteDatabase(sqlitePath)
   const client = await pool.connect()
 
   // Ordered to respect foreign key constraints (media before projects/globals)
@@ -219,16 +296,8 @@ export async function runSyncAndMigrate(options = { requireSqlite: false }) {
   try {
     await client.query('BEGIN')
 
-    const sqliteTables = new Set(
-      (
-        sqlite
-          .prepare("SELECT name FROM sqlite_master WHERE type='table'")
-          .all() as Array<{ name: string }>
-      ).map((r) => r.name),
-    )
-
     for (const table of tablesToMigrate) {
-      if (!sqliteTables.has(table)) {
+      if (!(table in sqliteData)) {
         console.log(`⏭️ Table "${table}" absente dans SQLite, ignorée.`)
         continue
       }
@@ -252,10 +321,7 @@ export async function runSyncAndMigrate(options = { requireSqlite: false }) {
         pgCols.map((c) => [c.column_name, c.data_type]),
       )
 
-      const sqliteRows = sqlite.prepare(`SELECT * FROM "${table}"`).all() as Record<
-        string,
-        unknown
-      >[]
+      const sqliteRows = sqliteData[table] || []
 
       if (sqliteRows.length === 0) {
         console.log(`ℹ️ Table "${table}" : 0 ligne dans SQLite.`)
@@ -272,7 +338,6 @@ export async function runSyncAndMigrate(options = { requireSqlite: false }) {
           coerceValue(row[col], pgColTypeMap.get(col) || 'text', col),
         )
 
-        // Check if row with same id already exists (compatible with all PostgreSQL versions including < 9.5)
         let exists = false
         if (pgColTypeMap.has('id') && row.id !== undefined && row.id !== null) {
           const checkRes = await client.query(
@@ -325,7 +390,6 @@ export async function runSyncAndMigrate(options = { requireSqlite: false }) {
     throw err
   } finally {
     client.release()
-    sqlite.close()
     if (typeof payload.db?.destroy === 'function') {
       await payload.db.destroy()
     }
