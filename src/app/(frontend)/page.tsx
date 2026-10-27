@@ -7,6 +7,8 @@ import { formatServerError, isNextRouterError } from '@/lib/serverErrorLogger'
 import config from '@/payload.config'
 import './styles.css'
 
+export const dynamic = 'force-dynamic'
+
 export default async function HomePage() {
   try {
     const headers = await getHeaders()

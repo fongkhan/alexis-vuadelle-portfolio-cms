@@ -8,9 +8,9 @@ import next from 'next'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+const envFilePath = path.resolve(__dirname, '.env')
 
-dotenv.config({ path: path.resolve(__dirname, '.env') })
-dotenv.config()
+dotenv.config({ path: envFilePath, override: true })
 
 // Default to production under Phusion Passenger unless explicitly running in development
 if (!process.env.NODE_ENV) {
@@ -74,6 +74,8 @@ let isReady = false
 app
   .prepare()
   .then(() => {
+    // Re-apply .env with override: true after Next.js app.prepare() so @next/env (dotenv-expand) does not mangle '$' in DATABASE_URL
+    dotenv.config({ path: envFilePath, override: true })
     isReady = true
     console.log(`> Next.js prepared (dev=${dev})`)
   })

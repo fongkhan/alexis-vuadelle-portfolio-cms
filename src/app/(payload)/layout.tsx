@@ -12,6 +12,8 @@ import { formatServerError, isNextRouterError } from '@/lib/serverErrorLogger'
 import { importMap } from './admin/importMap.js'
 import './custom.scss'
 
+export const dynamic = 'force-dynamic'
+
 type Args = {
   children: React.ReactNode
 }

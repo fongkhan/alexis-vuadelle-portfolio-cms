@@ -25,7 +25,7 @@ try {
   // Fallback to process.cwd()/src when bundled in CJS
 }
 
-// Search upward for .env so it is found even when bundled inside .next/server/app/...
+// Search upward for .env and use override: true so @next/env (dotenv-expand) or stale Passenger env vars never corrupt DATABASE_URL
 for (const envCandidate of [
   path.resolve(process.cwd(), '.env'),
   path.resolve(dirname, '../.env'),
@@ -36,14 +36,14 @@ for (const envCandidate of [
 ]) {
   try {
     if (fs.existsSync(envCandidate)) {
-      dotenv.config({ path: envCandidate })
+      dotenv.config({ path: envCandidate, override: true })
+      process.env.__LOADED_ENV_FILE = envCandidate
       break
     }
   } catch {
     // Ignore fs errors
   }
 }
-dotenv.config()
 
 const databaseUri =
   process.env.DATABASE_URL ||
