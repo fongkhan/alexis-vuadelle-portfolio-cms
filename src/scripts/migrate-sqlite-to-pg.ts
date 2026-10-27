@@ -146,6 +146,61 @@ const IGNORABLE_PG_CODES = new Set([
   '42P16', // invalid_table_definition (e.g. primary key already exists)
 ])
 
+interface PgQueryResult<TRow = Record<string, unknown>> {
+  rows: TRow[]
+}
+
+interface PgClient {
+  query: <TRow = Record<string, unknown>>(
+    sql: string,
+    params?: unknown[],
+  ) => Promise<PgQueryResult<TRow>>
+  release: () => void
+}
+
+interface PgPool {
+  connect: () => Promise<PgClient>
+}
+
+interface DrizzleColumnSnapshot {
+  name?: string
+  type?: string
+  default?: unknown
+}
+
+interface DrizzleTableSnapshot {
+  name?: string
+  columns?: Record<string, DrizzleColumnSnapshot>
+}
+
+interface DrizzleSnapshot {
+  tables?: Record<string, DrizzleTableSnapshot>
+}
+
+interface DrizzleKitApi {
+  generateDrizzleJson: (schema: unknown) => Promise<DrizzleSnapshot>
+  generateMigration: (before: unknown, after: DrizzleSnapshot) => Promise<string[]>
+}
+
+interface PostgresDbAdapter {
+  pool?: PgPool
+  schema?: unknown
+  defaultDrizzleSnapshot?: unknown
+  requireDrizzleKit: () => DrizzleKitApi
+  destroy?: () => Promise<void>
+}
+
+function getPgErrorInfo(err: unknown): { code?: string; message: string } {
+  if (typeof err === 'object' && err !== null) {
+    const record = err as Record<string, unknown>
+    return {
+      code: typeof record.code === 'string' ? record.code : undefined,
+      message: typeof record.message === 'string' ? record.message : String(err),
+    }
+  }
+  return { message: String(err) }
+}
+
 export async function runSyncAndMigrate(options = { requireSqlite: false }) {
   const dbUrl =
     process.env.DATABASE_URL ||
@@ -155,7 +210,7 @@ export async function runSyncAndMigrate(options = { requireSqlite: false }) {
   console.log(`🔌 Connexion à PostgreSQL : ${maskDatabaseUrl(dbUrl)}`)
 
   const payload = await getPayload({ config })
-  const dbAdapter = payload.db as any
+  const dbAdapter = payload.db as unknown as PostgresDbAdapter
   const pool = dbAdapter.pool
 
   if (!pool) {
@@ -166,7 +221,7 @@ export async function runSyncAndMigrate(options = { requireSqlite: false }) {
   let pgVersionNum = 100000
 
   try {
-    const verRes = await ddlClient.query(
+    const verRes = await ddlClient.query<{ ver: string; ver_num: number }>(
       `SELECT version() AS ver, current_setting('server_version_num')::int AS ver_num`,
     )
     pgVersionNum = Number(verRes.rows[0]?.ver_num) || 100000
@@ -193,17 +248,19 @@ export async function runSyncAndMigrate(options = { requireSqlite: false }) {
 
       try {
         await ddlClient.query(stmt)
-      } catch (err: any) {
-        if (err?.code && IGNORABLE_PG_CODES.has(err.code)) {
+      } catch (err: unknown) {
+        const pgErr = getPgErrorInfo(err)
+        if (pgErr.code && IGNORABLE_PG_CODES.has(pgErr.code)) {
           continue
         }
-        console.warn(`⚠️ Avertissement DDL (${err?.code || 'unknown'}) : ${err?.message}`)
+        console.warn(`⚠️ Avertissement DDL (${pgErr.code || 'unknown'}) : ${pgErr.message}`)
       }
     }
 
     // Also ensure any newly added columns on already-existing tables are created
     if (drizzleJsonAfter?.tables) {
-      for (const tableObj of Object.values<any>(drizzleJsonAfter.tables)) {
+      const tableList: DrizzleTableSnapshot[] = Object.values(drizzleJsonAfter.tables)
+      for (const tableObj of tableList) {
         const tableName = tableObj?.name
         const columns = tableObj?.columns
         if (!tableName || !columns) continue
@@ -216,7 +273,8 @@ export async function runSyncAndMigrate(options = { requireSqlite: false }) {
         )
         const existingSet = new Set(existingCols.map((c) => c.column_name))
 
-        for (const colObj of Object.values<any>(columns)) {
+        const colList: DrizzleColumnSnapshot[] = Object.values(columns)
+        for (const colObj of colList) {
           const colName = colObj?.name
           if (!colName || existingSet.has(colName)) continue
 
@@ -225,17 +283,18 @@ export async function runSyncAndMigrate(options = { requireSqlite: false }) {
             colType = 'json'
           }
           const defaultClause =
-            colObj.default !== undefined ? ` DEFAULT ${colObj.default}` : ''
+            colObj.default !== undefined ? ` DEFAULT ${String(colObj.default)}` : ''
 
           try {
             console.log(`➕ Ajout de la colonne manquante "${tableName}"."${colName}"...`)
             await ddlClient.query(
               `ALTER TABLE "${tableName}" ADD COLUMN "${colName}" ${colType}${defaultClause}`,
             )
-          } catch (err: any) {
-            if (err?.code && IGNORABLE_PG_CODES.has(err.code)) continue
+          } catch (err: unknown) {
+            const pgErr = getPgErrorInfo(err)
+            if (pgErr.code && IGNORABLE_PG_CODES.has(pgErr.code)) continue
             console.warn(
-              `⚠️ Impossible d'ajouter la colonne "${tableName}"."${colName}": ${err?.message}`,
+              `⚠️ Impossible d'ajouter la colonne "${tableName}"."${colName}": ${pgErr.message}`,
             )
           }
         }
